@@ -311,6 +311,48 @@ h3 {
   background: rgba(255, 255, 255, 0.86);
   box-shadow: var(--shadow-soft);
   backdrop-filter: blur(10px);
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.search-strip-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+
+.filter-bar {
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.filter-bar[hidden] {
+  display: none !important;
+}
+
+.filter-bar-inner {
+  display: flex;
+  align-items: end;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.filter-bar-label {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding-right: 6px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 950;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.filter-field {
+  min-width: 148px;
 }
 
 .search-box {
@@ -519,6 +561,57 @@ h3 {
 
 .grid.four {
   grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.grid.kpi-grid,
+.kpi-grid {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.kpi-section {
+  display: grid;
+  gap: 14px;
+}
+
+.analytics-panel {
+  overflow: hidden;
+}
+
+.chart-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.chart-card {
+  display: grid;
+  gap: 12px;
+  min-height: 320px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: linear-gradient(180deg, #ffffff, #f8fbf9);
+}
+
+.chart-card-header h3 {
+  margin-bottom: 4px;
+  font-size: 0.98rem;
+}
+
+.chart-card-header p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.chart-wrap {
+  position: relative;
+  min-height: 240px;
+}
+
+.chart-wrap canvas {
+  width: 100% !important;
+  height: 100% !important;
 }
 
 .panel,
@@ -973,8 +1066,14 @@ tr:last-child td {
   }
 
   .grid.four,
-  .report-summary {
+  .report-summary,
+  .grid.kpi-grid,
+  .kpi-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .chart-grid {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -1032,7 +1131,10 @@ tr:last-child td {
   .grid.two,
   .grid.three,
   .grid.four,
-  .report-summary {
+  .report-summary,
+  .grid.kpi-grid,
+  .kpi-grid,
+  .chart-grid {
     grid-template-columns: 1fr;
   }
 

@@ -245,6 +245,91 @@ const seedData = {
       challan: 1000,
       salaryAdvance: 0,
       notes: "Traffic fine near Kishangarh"
+    },
+    {
+      id: "trip-5",
+      date: "2026-05-15",
+      vehicleId: "veh-1",
+      routeId: "route-1",
+      driverId: "staff-1",
+      conductorId: "staff-3",
+      status: "Completed",
+      passengers: 38,
+      collection: 6080,
+      fuel: 2250,
+      toll: 360,
+      repair: 0,
+      challan: 0,
+      salaryAdvance: 0,
+      notes: "May mid-month run"
+    },
+    {
+      id: "trip-6",
+      date: "2026-04-22",
+      vehicleId: "veh-2",
+      routeId: "route-2",
+      driverId: "staff-2",
+      conductorId: "staff-4",
+      status: "Completed",
+      passengers: 27,
+      collection: 5130,
+      fuel: 2150,
+      toll: 420,
+      repair: 450,
+      challan: 0,
+      salaryAdvance: 0,
+      notes: "Brake pad replacement"
+    },
+    {
+      id: "trip-7",
+      date: "2026-03-10",
+      vehicleId: "veh-1",
+      routeId: "route-1",
+      driverId: "staff-1",
+      conductorId: "staff-3",
+      status: "Completed",
+      passengers: 40,
+      collection: 6400,
+      fuel: 2380,
+      toll: 360,
+      repair: 0,
+      challan: 0,
+      salaryAdvance: 300,
+      notes: "Holi season rush"
+    },
+    {
+      id: "trip-8",
+      date: "2026-02-08",
+      vehicleId: "veh-2",
+      routeId: "route-2",
+      driverId: "staff-2",
+      conductorId: "staff-4",
+      status: "Completed",
+      passengers: 22,
+      collection: 4180,
+      fuel: 2000,
+      toll: 420,
+      repair: 0,
+      challan: 0,
+      salaryAdvance: 0,
+      notes: "Winter schedule"
+    },
+    {
+      id: "trip-9",
+      date: "2026-01-18",
+      vehicleId: "veh-1",
+      routeId: "route-1",
+      driverId: "staff-1",
+      conductorId: "staff-3",
+      status: "Completed",
+      passengers: 35,
+      collection: 5600,
+      fuel: 2200,
+      toll: 360,
+      repair: 0,
+      challan: 500,
+      salaryAdvance: 0,
+      notes: "New year week"
     }
   ],
   expenses: [
@@ -265,12 +350,62 @@ const seedData = {
       amount: 3200,
       paidTo: "RTO",
       note: "Quarterly road tax"
+    },
+    {
+      id: "exp-3",
+      date: "2026-05-12",
+      vehicleId: "veh-2",
+      category: "Fuel",
+      amount: 4500,
+      paidTo: "Indian Oil Pump",
+      note: "Bulk diesel purchase"
+    },
+    {
+      id: "exp-4",
+      date: "2026-04-05",
+      vehicleId: "",
+      category: "Salary",
+      amount: 12000,
+      paidTo: "Staff payroll",
+      note: "April advance salaries"
+    },
+    {
+      id: "exp-5",
+      date: "2026-03-20",
+      vehicleId: "veh-1",
+      category: "Permit",
+      amount: 5600,
+      paidTo: "RTO Jaipur",
+      note: "Route permit renewal"
+    },
+    {
+      id: "exp-6",
+      date: "2026-02-14",
+      vehicleId: "veh-3",
+      category: "EMI",
+      amount: 18500,
+      paidTo: "HDFC Bank",
+      note: "Vehicle loan EMI"
     }
-  ]
+  ],
+  filters: {
+    dashboard: { months: "6" },
+    trips: { status: "", vehicleId: "", sortBy: "date", sortDir: "desc" },
+    vehicles: { status: "", type: "", sortBy: "plate", sortDir: "asc" },
+    staff: { role: "", status: "", sortBy: "name", sortDir: "asc" },
+    routes: { status: "", shift: "", sortBy: "name", sortDir: "asc" },
+    expenses: { category: "", vehicleId: "", sortBy: "date", sortDir: "desc" }
+  }
 };
 
 let state = loadState();
 let toastTimer = null;
+let chartInstances = [];
+
+const defaultFilters = structuredClone(seedData.filters);
+
+const ACTIVE_TRIP_STATUSES = ["Running", "Scheduled", "In Transit", "Pending"];
+const COMPLETED_TRIP_STATUSES = ["Completed"];
 
 function loadState() {
   const saved = localStorage.getItem(STORAGE_KEY);
@@ -287,7 +422,17 @@ function normalizeState(source) {
   const merged = {
     ...structuredClone(seedData),
     ...source,
-    business: { ...seedData.business, ...(source.business || {}) }
+    business: { ...seedData.business, ...(source.business || {}) },
+    filters: {
+      ...defaultFilters,
+      ...(source.filters || {}),
+      dashboard: { ...defaultFilters.dashboard, ...(source.filters?.dashboard || {}) },
+      trips: { ...defaultFilters.trips, ...(source.filters?.trips || {}) },
+      vehicles: { ...defaultFilters.vehicles, ...(source.filters?.vehicles || {}) },
+      staff: { ...defaultFilters.staff, ...(source.filters?.staff || {}) },
+      routes: { ...defaultFilters.routes, ...(source.filters?.routes || {}) },
+      expenses: { ...defaultFilters.expenses, ...(source.filters?.expenses || {}) }
+    }
   };
 
   return sanitizeState(merged);
@@ -398,6 +543,384 @@ function netProfit(trips = state.trips, expenses = state.expenses) {
   return totalTripCollection(trips) - totalTripExpenses(trips) - totalExtraExpenses(expenses);
 }
 
+function totalRevenue(trips = state.trips) {
+  return totalTripCollection(trips);
+}
+
+function totalExpensesAll(trips = state.trips, expenses = state.expenses) {
+  return totalTripExpenses(trips) + totalExtraExpenses(expenses);
+}
+
+function countActiveTrips(trips = state.trips) {
+  return trips.filter((trip) => ACTIVE_TRIP_STATUSES.includes(trip.status)).length;
+}
+
+function countCompletedTrips(trips = state.trips) {
+  return trips.filter((trip) => COMPLETED_TRIP_STATUSES.includes(trip.status)).length;
+}
+
+function getFilterConfig(view = state.activeView) {
+  return state.filters[view] || {};
+}
+
+function setFilterValue(view, key, value) {
+  if (!state.filters[view]) state.filters[view] = { ...defaultFilters[view] };
+  state.filters[view][key] = value;
+}
+
+function sortItems(items, sortBy, sortDir, getters) {
+  const direction = sortDir === "asc" ? 1 : -1;
+  const getter = getters[sortBy] || getters.default;
+
+  return [...items].sort((left, right) => {
+    const a = getter(left);
+    const b = getter(right);
+
+    if (typeof a === "number" && typeof b === "number") return (a - b) * direction;
+    return String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: "base" }) * direction;
+  });
+}
+
+function applyTripFilters(trips) {
+  const filters = getFilterConfig("trips");
+  return trips.filter((trip) => {
+    if (filters.status && trip.status !== filters.status) return false;
+    if (filters.vehicleId && trip.vehicleId !== filters.vehicleId) return false;
+    return true;
+  });
+}
+
+function applyVehicleFilters(vehicles) {
+  const filters = getFilterConfig("vehicles");
+  return vehicles.filter((vehicle) => {
+    if (filters.status && vehicle.status !== filters.status) return false;
+    if (filters.type && vehicle.type !== filters.type) return false;
+    return true;
+  });
+}
+
+function applyStaffFilters(people) {
+  const filters = getFilterConfig("staff");
+  return people.filter((person) => {
+    if (filters.role && person.role !== filters.role) return false;
+    if (filters.status && person.status !== filters.status) return false;
+    return true;
+  });
+}
+
+function applyRouteFilters(routes) {
+  const filters = getFilterConfig("routes");
+  return routes.filter((route) => {
+    if (filters.status && route.status !== filters.status) return false;
+    if (filters.shift && route.shift !== filters.shift) return false;
+    return true;
+  });
+}
+
+function applyExpenseFilters(expenses) {
+  const filters = getFilterConfig("expenses");
+  return expenses.filter((expense) => {
+    if (filters.category && expense.category !== filters.category) return false;
+    if (filters.vehicleId && expense.vehicleId !== filters.vehicleId) return false;
+    return true;
+  });
+}
+
+function getFilteredTrips() {
+  const searched = state.trips.filter((trip) =>
+    matchesSearch(trip.date, vehicleName(trip.vehicleId), routeName(trip.routeId), staffName(trip.driverId), trip.status, trip.notes)
+  );
+  const filters = getFilterConfig("trips");
+  return sortItems(applyTripFilters(searched), filters.sortBy, filters.sortDir, {
+    date: (trip) => trip.date,
+    collection: (trip) => Number(trip.collection || 0),
+    profit: (trip) => tripProfit(trip),
+    status: (trip) => trip.status,
+    default: (trip) => trip.date
+  });
+}
+
+function getFilteredVehicles() {
+  const searched = state.vehicles.filter((vehicle) =>
+    matchesSearch(vehicle.plate, vehicle.type, vehicle.status, routeName(vehicle.routeId), staffName(vehicle.driverId), staffName(vehicle.conductorId))
+  );
+  const filters = getFilterConfig("vehicles");
+  return sortItems(applyVehicleFilters(searched), filters.sortBy, filters.sortDir, {
+    plate: (vehicle) => vehicle.plate,
+    type: (vehicle) => vehicle.type,
+    status: (vehicle) => vehicle.status,
+    default: (vehicle) => vehicle.plate
+  });
+}
+
+function getFilteredStaff() {
+  const searched = state.staff.filter((person) =>
+    matchesSearch(person.name, person.role, person.phone, person.status, person.licenseNo, person.address, vehicleName(person.assignedVehicleId))
+  );
+  const filters = getFilterConfig("staff");
+  return sortItems(applyStaffFilters(searched), filters.sortBy, filters.sortDir, {
+    name: (person) => person.name,
+    role: (person) => person.role,
+    salary: (person) => Number(person.salary || 0),
+    status: (person) => person.status,
+    default: (person) => person.name
+  });
+}
+
+function getFilteredRoutes() {
+  const searched = state.routes.filter((route) => matchesSearch(route.name, route.start, route.end, route.stops, route.shift, route.status));
+  const filters = getFilterConfig("routes");
+  return sortItems(applyRouteFilters(searched), filters.sortBy, filters.sortDir, {
+    name: (route) => route.name,
+    distance: (route) => Number(route.distance || 0),
+    fare: (route) => Number(route.fare || 0),
+    status: (route) => route.status,
+    default: (route) => route.name
+  });
+}
+
+function getFilteredExpenses() {
+  const searched = state.expenses.filter((expense) =>
+    matchesSearch(expense.date, vehicleName(expense.vehicleId), expense.category, expense.paidTo, expense.note)
+  );
+  const filters = getFilterConfig("expenses");
+  return sortItems(applyExpenseFilters(searched), filters.sortBy, filters.sortDir, {
+    date: (expense) => expense.date,
+    amount: (expense) => Number(expense.amount || 0),
+    category: (expense) => expense.category,
+    default: (expense) => expense.date
+  });
+}
+
+function getMonthKey(dateValue) {
+  if (!dateValue) return "";
+  return dateValue.slice(0, 7);
+}
+
+function formatMonthLabel(monthKey) {
+  if (!monthKey) return "";
+  const [year, month] = monthKey.split("-");
+  return new Intl.DateTimeFormat("en-IN", { month: "short", year: "2-digit" }).format(new Date(Number(year), Number(month) - 1, 1));
+}
+
+function getMonthlyAnalyticsData(trips = state.trips, expenses = state.expenses) {
+  const monthCount = Number(getFilterConfig("dashboard").months || 6);
+  const monthKeys = [];
+
+  for (let index = monthCount - 1; index >= 0; index -= 1) {
+    const date = new Date();
+    date.setDate(1);
+    date.setHours(0, 0, 0, 0);
+    date.setMonth(date.getMonth() - index);
+    monthKeys.push(`${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`);
+  }
+
+  const revenueByMonth = Object.fromEntries(monthKeys.map((key) => [key, 0]));
+  const expenseByMonth = Object.fromEntries(monthKeys.map((key) => [key, 0]));
+  const tripsByMonth = Object.fromEntries(monthKeys.map((key) => [key, 0]));
+
+  trips.forEach((trip) => {
+    const key = getMonthKey(trip.date);
+    if (!Object.hasOwn(revenueByMonth, key)) return;
+    revenueByMonth[key] += Number(trip.collection || 0);
+    expenseByMonth[key] += tripExpense(trip);
+    tripsByMonth[key] += 1;
+  });
+
+  expenses.forEach((expense) => {
+    const key = getMonthKey(expense.date);
+    if (!Object.hasOwn(expenseByMonth, key)) return;
+    expenseByMonth[key] += Number(expense.amount || 0);
+  });
+
+  return {
+    labels: monthKeys.map(formatMonthLabel),
+    revenue: monthKeys.map((key) => revenueByMonth[key]),
+    expenses: monthKeys.map((key) => expenseByMonth[key]),
+    trips: monthKeys.map((key) => tripsByMonth[key])
+  };
+}
+
+function destroyCharts() {
+  chartInstances.forEach((chart) => chart.destroy());
+  chartInstances = [];
+}
+
+function chartColors() {
+  return {
+    green: "#0f7a54",
+    greenSoft: "rgba(15, 122, 84, 0.14)",
+    amber: "#b16b18",
+    amberSoft: "rgba(177, 107, 24, 0.14)",
+    blue: "#245f94",
+    blueSoft: "rgba(36, 95, 148, 0.14)"
+  };
+}
+
+function initDashboardCharts() {
+  destroyCharts();
+  if (state.activeView !== "dashboard" || typeof Chart === "undefined") return;
+
+  const analytics = getMonthlyAnalyticsData(state.trips, state.expenses);
+  const colors = chartColors();
+  const baseOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: "#111917",
+        padding: 12,
+        cornerRadius: 8
+      }
+    },
+    scales: {
+      x: {
+        grid: { display: false },
+        ticks: { color: "#64716d", font: { weight: "600" } }
+      },
+      y: {
+        beginAtZero: true,
+        grid: { color: "rgba(220, 229, 225, 0.8)" },
+        ticks: { color: "#64716d" }
+      }
+    }
+  };
+
+  const revenueCanvas = document.getElementById("revenueTrendChart");
+  if (revenueCanvas) {
+    chartInstances.push(
+      new Chart(revenueCanvas, {
+        type: "line",
+        data: {
+          labels: analytics.labels,
+          datasets: [
+            {
+              label: "Revenue",
+              data: analytics.revenue,
+              borderColor: colors.green,
+              backgroundColor: colors.greenSoft,
+              fill: true,
+              tension: 0.35,
+              pointRadius: 4,
+              pointHoverRadius: 6
+            }
+          ]
+        },
+        options: {
+          ...baseOptions,
+          plugins: {
+            ...baseOptions.plugins,
+            tooltip: {
+              ...baseOptions.plugins.tooltip,
+              callbacks: {
+                label: (context) => `Revenue: ${money(context.parsed.y)}`
+              }
+            }
+          },
+          scales: {
+            ...baseOptions.scales,
+            y: {
+              ...baseOptions.scales.y,
+              ticks: {
+                ...baseOptions.scales.y.ticks,
+                callback: (value) => money(value)
+              }
+            }
+          }
+        }
+      })
+    );
+  }
+
+  const expenseCanvas = document.getElementById("expenseTrendChart");
+  if (expenseCanvas) {
+    chartInstances.push(
+      new Chart(expenseCanvas, {
+        type: "bar",
+        data: {
+          labels: analytics.labels,
+          datasets: [
+            {
+              label: "Expenses",
+              data: analytics.expenses,
+              backgroundColor: colors.amber,
+              borderRadius: 8,
+              maxBarThickness: 42
+            }
+          ]
+        },
+        options: {
+          ...baseOptions,
+          plugins: {
+            ...baseOptions.plugins,
+            tooltip: {
+              ...baseOptions.plugins.tooltip,
+              callbacks: {
+                label: (context) => `Expenses: ${money(context.parsed.y)}`
+              }
+            }
+          },
+          scales: {
+            ...baseOptions.scales,
+            y: {
+              ...baseOptions.scales.y,
+              ticks: {
+                ...baseOptions.scales.y.ticks,
+                callback: (value) => money(value)
+              }
+            }
+          }
+        }
+      })
+    );
+  }
+
+  const tripsCanvas = document.getElementById("tripsPerMonthChart");
+  if (tripsCanvas) {
+    chartInstances.push(
+      new Chart(tripsCanvas, {
+        type: "bar",
+        data: {
+          labels: analytics.labels,
+          datasets: [
+            {
+              label: "Trips",
+              data: analytics.trips,
+              backgroundColor: colors.blue,
+              borderRadius: 8,
+              maxBarThickness: 42
+            }
+          ]
+        },
+        options: {
+          ...baseOptions,
+          plugins: {
+            ...baseOptions.plugins,
+            tooltip: {
+              ...baseOptions.plugins.tooltip,
+              callbacks: {
+                label: (context) => `Trips: ${context.parsed.y}`
+              }
+            }
+          },
+          scales: {
+            ...baseOptions.scales,
+            y: {
+              ...baseOptions.scales.y,
+              ticks: {
+                ...baseOptions.scales.y.ticks,
+                stepSize: 1,
+                precision: 0
+              }
+            }
+          }
+        }
+      })
+    );
+  }
+}
+
 function currentAllowedViews() {
   return permissions[state.role] || permissions.owner;
 }
@@ -469,6 +992,7 @@ function render() {
   ensureAllowedView();
   renderNav();
   renderQuickStats();
+  renderViewFilters();
   document.getElementById("roleSelect").value = state.role;
   document.getElementById("globalSearch").value = state.search;
   const activeItem = navItems.find((item) => item.id === state.activeView);
@@ -476,6 +1000,7 @@ function render() {
 
   const view = document.getElementById("appView");
   if (!canView(state.activeView)) {
+    destroyCharts();
     view.innerHTML = renderAccessDenied();
     return;
   }
@@ -493,6 +1018,7 @@ function render() {
   };
 
   view.innerHTML = renderers[state.activeView]();
+  initDashboardCharts();
 }
 
 function renderNav() {
@@ -528,13 +1054,141 @@ function renderQuickStats() {
   const todayTrips = state.trips.filter((trip) => trip.date === today);
   const activeVehicles = state.vehicles.filter((vehicle) => vehicle.status === "Active").length;
   const reminders = getReminders().filter((item) => item.days <= 30).length;
+  const filteredTrips = getFilteredTrips();
 
   document.getElementById("quickStats").innerHTML = `
     <span class="stat-pill">${todayTrips.length} trips today</span>
     <span class="stat-pill">${activeVehicles} active vehicles</span>
-    <span class="stat-pill">${money(netProfit())} net profit</span>
+    <span class="stat-pill">${money(netProfit(filteredTrips, state.expenses))} net profit</span>
+    <span class="stat-pill">${countActiveTrips(filteredTrips)} active trips</span>
     <span class="stat-pill">${reminders} urgent reminders</span>
   `;
+}
+
+function filterSelect(view, key, label, options, allLabel = "All") {
+  const value = getFilterConfig(view)[key] || "";
+  const normalized = options.map((option) => (Array.isArray(option) ? option : [option, option]));
+
+  return `
+    <label class="field compact filter-field">
+      <span>${label}</span>
+      <select data-filter-view="${view}" data-filter-key="${key}">
+        <option value="" ${value === "" ? "selected" : ""}>${allLabel}</option>
+        ${normalized.map(([optionValue, optionLabel]) => `<option value="${optionValue}" ${String(optionValue) === String(value) ? "selected" : ""}>${optionLabel}</option>`).join("")}
+      </select>
+    </label>
+  `;
+}
+
+function filterSort(view, sortOptions) {
+  const filters = getFilterConfig(view);
+  const options = sortOptions.map((option) => (Array.isArray(option) ? option : [option, option]));
+
+  return `
+    <label class="field compact filter-field">
+      <span>Sort By</span>
+      <select data-filter-view="${view}" data-filter-key="sortBy">
+        ${options.map(([optionValue, optionLabel]) => `<option value="${optionValue}" ${filters.sortBy === optionValue ? "selected" : ""}>${optionLabel}</option>`).join("")}
+      </select>
+    </label>
+    <label class="field compact filter-field">
+      <span>Order</span>
+      <select data-filter-view="${view}" data-filter-key="sortDir">
+        <option value="asc" ${filters.sortDir === "asc" ? "selected" : ""}>Ascending</option>
+        <option value="desc" ${filters.sortDir === "desc" ? "selected" : ""}>Descending</option>
+      </select>
+    </label>
+  `;
+}
+
+function renderViewFilters() {
+  const container = document.getElementById("viewFilters");
+  const view = state.activeView;
+  const filterViews = ["dashboard", "trips", "vehicles", "staff", "routes", "accounts"];
+
+  if (!filterViews.includes(view)) {
+    container.hidden = true;
+    container.innerHTML = "";
+    return;
+  }
+
+  container.hidden = false;
+
+  if (view === "dashboard") {
+    const months = getFilterConfig("dashboard").months || "6";
+    container.innerHTML = `
+      <div class="filter-bar-inner">
+        <span class="filter-bar-label">Analytics Range</span>
+        ${filterSelect("dashboard", "months", "Months", [["3", "Last 3 months"], ["6", "Last 6 months"], ["12", "Last 12 months"]], "Last 6 months")}
+        <button class="ghost-button" type="button" data-action="clear-filters" data-filter-view="dashboard">Reset</button>
+      </div>
+    `;
+    return;
+  }
+
+  if (view === "trips") {
+    container.innerHTML = `
+      <div class="filter-bar-inner">
+        <span class="filter-bar-label">Trip Filters</span>
+        ${filterSelect("trips", "status", "Status", ["Scheduled", "Running", "Completed", "Cancelled", "Pending", "In Transit"])}
+        ${filterSelect("trips", "vehicleId", "Vehicle", state.vehicles.map((vehicle) => [vehicle.id, vehicle.plate]))}
+        ${filterSort("trips", [["date", "Date"], ["collection", "Collection"], ["profit", "Profit"], ["status", "Status"]])}
+        <button class="ghost-button" type="button" data-action="clear-filters" data-filter-view="trips">Clear Filters</button>
+      </div>
+    `;
+    return;
+  }
+
+  if (view === "vehicles") {
+    container.innerHTML = `
+      <div class="filter-bar-inner">
+        <span class="filter-bar-label">Vehicle Filters</span>
+        ${filterSelect("vehicles", "status", "Status", ["Active", "Maintenance", "Paused"])}
+        ${filterSelect("vehicles", "type", "Type", ["Bus", "Mini Bus", "Traveller", "Truck", "Tempo", "Car"])}
+        ${filterSort("vehicles", [["plate", "Plate"], ["type", "Type"], ["status", "Status"]])}
+        <button class="ghost-button" type="button" data-action="clear-filters" data-filter-view="vehicles">Clear Filters</button>
+      </div>
+    `;
+    return;
+  }
+
+  if (view === "staff") {
+    container.innerHTML = `
+      <div class="filter-bar-inner">
+        <span class="filter-bar-label">Staff Filters</span>
+        ${filterSelect("staff", "role", "Role", ["Driver", "Conductor", "Accountant", "Dispatcher", "Mechanic"])}
+        ${filterSelect("staff", "status", "Attendance", ["Present", "Leave", "Absent"])}
+        ${filterSort("staff", [["name", "Name"], ["role", "Role"], ["salary", "Salary"], ["status", "Attendance"]])}
+        <button class="ghost-button" type="button" data-action="clear-filters" data-filter-view="staff">Clear Filters</button>
+      </div>
+    `;
+    return;
+  }
+
+  if (view === "routes") {
+    container.innerHTML = `
+      <div class="filter-bar-inner">
+        <span class="filter-bar-label">Route Filters</span>
+        ${filterSelect("routes", "status", "Status", ["Active", "Paused"])}
+        ${filterSelect("routes", "shift", "Shift", ["Morning", "Afternoon", "Evening", "Night", "School", "Goods"])}
+        ${filterSort("routes", [["name", "Route"], ["distance", "Distance"], ["fare", "Fare"], ["status", "Status"]])}
+        <button class="ghost-button" type="button" data-action="clear-filters" data-filter-view="routes">Clear Filters</button>
+      </div>
+    `;
+    return;
+  }
+
+  if (view === "accounts") {
+    container.innerHTML = `
+      <div class="filter-bar-inner">
+        <span class="filter-bar-label">Expense Filters</span>
+        ${filterSelect("expenses", "category", "Category", expenseCategories)}
+        ${filterSelect("expenses", "vehicleId", "Vehicle", state.vehicles.map((vehicle) => [vehicle.id, vehicle.plate]))}
+        ${filterSort("expenses", [["date", "Date"], ["amount", "Amount"], ["category", "Category"]])}
+        <button class="ghost-button" type="button" data-action="clear-filters" data-filter-view="expenses">Clear Filters</button>
+      </div>
+    `;
+  }
 }
 
 function renderAccessDenied() {
@@ -546,14 +1200,14 @@ function renderAccessDenied() {
 }
 
 function renderDashboard() {
-  const filteredTrips = state.trips.filter((trip) =>
-    matchesSearch(trip.date, vehicleName(trip.vehicleId), routeName(trip.routeId), staffName(trip.driverId), trip.status, trip.notes)
-  );
+  const filteredTrips = getFilteredTrips();
   const urgentReminders = getReminders().slice(0, 5);
-  const bestVehicle = getVehicleProfitRanking()[0];
   const today = new Date().toISOString().slice(0, 10);
   const todayTrips = state.trips.filter((trip) => trip.date === today).length;
   const activeVehicles = state.vehicles.filter((vehicle) => vehicle.status === "Active").length;
+  const revenue = totalRevenue(filteredTrips);
+  const expenses = totalExpensesAll(filteredTrips, state.expenses);
+  const profit = netProfit(filteredTrips, state.expenses);
 
   return `
     <section class="premium-hero">
@@ -569,16 +1223,63 @@ function renderDashboard() {
         <div class="hero-board-row"><span>Active Vehicles</span><strong>${activeVehicles}</strong></div>
         <div class="hero-board-row"><span>Trips Today</span><strong>${todayTrips}</strong></div>
         <div class="hero-board-row"><span>Total Routes</span><strong>${state.routes.length}</strong></div>
-        <div class="hero-board-row"><span>Current Profit</span><strong>${money(netProfit())}</strong></div>
+        <div class="hero-board-row"><span>Current Profit</span><strong>${money(profit)}</strong></div>
       </div>
     </section>
 
-    <div class="grid four">
-      ${metricCard("Total Collection", money(totalTripCollection(filteredTrips)), `${filteredTrips.length} matching trips`, "green")}
-      ${metricCard("Trip Expenses", money(totalTripExpenses(filteredTrips)), "Fuel, toll, repair, challan", "amber")}
-      ${metricCard("Net Profit", money(netProfit(filteredTrips, state.expenses)), "After extra expenses", netProfit(filteredTrips, state.expenses) >= 0 ? "blue" : "red")}
-      ${metricCard("Top Vehicle", bestVehicle ? vehicleName(bestVehicle.vehicleId) : "-", bestVehicle ? money(bestVehicle.profit) : "No trips", "green")}
-    </div>
+    <section class="kpi-section" aria-label="Key performance indicators">
+      <div class="panel-header">
+        <div>
+          <h2>Business KPIs</h2>
+          <p>Revenue, expenses, profit, and trip activity at a glance.</p>
+        </div>
+      </div>
+      <div class="grid kpi-grid">
+        ${metricCard("Total Revenue", money(revenue), `${filteredTrips.length} trips in scope`, "green")}
+        ${metricCard("Total Expenses", money(expenses), "Trip costs plus ledger entries", "amber")}
+        ${metricCard("Net Profit", money(profit), profit >= 0 ? "Healthy margin" : "Review costs", profit >= 0 ? "blue" : "red")}
+        ${metricCard("Active Trips", countActiveTrips(filteredTrips), "Running or scheduled", "blue")}
+        ${metricCard("Completed Trips", countCompletedTrips(filteredTrips), "Successfully closed", "green")}
+      </div>
+    </section>
+
+    <section class="panel analytics-panel">
+      <div class="panel-header">
+        <div>
+          <h2>Analytics Overview</h2>
+          <p>Monthly revenue, expense, and trip trends powered by Chart.js.</p>
+        </div>
+      </div>
+      <div class="chart-grid">
+        <article class="chart-card">
+          <div class="chart-card-header">
+            <h3>Revenue Trend</h3>
+            <p>Monthly passenger and freight collection</p>
+          </div>
+          <div class="chart-wrap">
+            <canvas id="revenueTrendChart" aria-label="Revenue trend chart"></canvas>
+          </div>
+        </article>
+        <article class="chart-card">
+          <div class="chart-card-header">
+            <h3>Expense Trend</h3>
+            <p>Trip costs and ledger expenses combined</p>
+          </div>
+          <div class="chart-wrap">
+            <canvas id="expenseTrendChart" aria-label="Expense trend chart"></canvas>
+          </div>
+        </article>
+        <article class="chart-card">
+          <div class="chart-card-header">
+            <h3>Trips Per Month</h3>
+            <p>Operational volume across the selected range</p>
+          </div>
+          <div class="chart-wrap">
+            <canvas id="tripsPerMonthChart" aria-label="Trips per month chart"></canvas>
+          </div>
+        </article>
+      </div>
+    </section>
 
     <div class="grid two">
       <section class="panel">
@@ -648,9 +1349,7 @@ function renderMiniChart() {
 }
 
 function renderTrips() {
-  const trips = state.trips.filter((trip) =>
-    matchesSearch(trip.date, vehicleName(trip.vehicleId), routeName(trip.routeId), staffName(trip.driverId), staffName(trip.conductorId), trip.status, trip.notes)
-  );
+  const trips = getFilteredTrips();
 
   return `
     <div class="grid two">
@@ -658,7 +1357,7 @@ function renderTrips() {
         <div class="panel-header">
           <div>
             <h2>Trip Register</h2>
-            <p>Daily collection and running cost entry.</p>
+            <p>Daily collection and running cost entry. Showing ${trips.length} of ${state.trips.length} trips.</p>
           </div>
           <div class="toolbar">
             <button class="secondary-button" data-action="export-csv" data-type="trips">Export CSV</button>
@@ -700,7 +1399,7 @@ function renderTrips() {
 }
 
 function renderTripsTable(trips) {
-  if (!trips.length) return emptyState("No trip found for this search.");
+  if (!trips.length) return emptyState("No trips match your search or filters.");
 
   return `
     <div class="table-wrap">
@@ -748,9 +1447,7 @@ function renderTripsTable(trips) {
 }
 
 function renderVehicles() {
-  const vehicles = state.vehicles.filter((vehicle) =>
-    matchesSearch(vehicle.plate, vehicle.type, vehicle.status, routeName(vehicle.routeId), staffName(vehicle.driverId), staffName(vehicle.conductorId))
-  );
+  const vehicles = getFilteredVehicles();
 
   return `
     <div class="grid two">
@@ -758,7 +1455,7 @@ function renderVehicles() {
         <div class="panel-header">
           <div>
             <h2>Vehicle Register</h2>
-            <p>Vehicle, document, route, driver, and conductor details.</p>
+            <p>Vehicle, document, route, driver, and conductor details. Showing ${vehicles.length} of ${state.vehicles.length} vehicles.</p>
           </div>
         </div>
         ${renderVehiclesTable(vehicles)}
@@ -793,7 +1490,7 @@ function renderVehicles() {
 }
 
 function renderVehiclesTable(vehicles) {
-  if (!vehicles.length) return emptyState("No vehicle found for this search.");
+  if (!vehicles.length) return emptyState("No vehicles match your search or filters.");
 
   return `
     <div class="table-wrap">
@@ -836,9 +1533,7 @@ function renderVehiclesTable(vehicles) {
 }
 
 function renderStaff() {
-  const people = state.staff.filter((person) =>
-    matchesSearch(person.name, person.role, person.phone, person.status, person.licenseNo, person.address, vehicleName(person.assignedVehicleId))
-  );
+  const people = getFilteredStaff();
 
   return `
     <div class="grid two">
@@ -846,7 +1541,7 @@ function renderStaff() {
         <div class="panel-header">
           <div>
             <h2>Driver & Conductor Register</h2>
-            <p>Staff salary, attendance, license, and assigned vehicle.</p>
+            <p>Staff salary, attendance, license, and assigned vehicle. Showing ${people.length} of ${state.staff.length} staff.</p>
           </div>
         </div>
         ${renderStaffTable(people)}
@@ -880,7 +1575,7 @@ function renderStaff() {
 }
 
 function renderStaffTable(people) {
-  if (!people.length) return emptyState("No staff found for this search.");
+  if (!people.length) return emptyState("No staff match your search or filters.");
 
   return `
     <div class="table-wrap">
@@ -921,7 +1616,7 @@ function renderStaffTable(people) {
 }
 
 function renderRoutes() {
-  const routes = state.routes.filter((route) => matchesSearch(route.name, route.start, route.end, route.stops, route.shift, route.status));
+  const routes = getFilteredRoutes();
 
   return `
     <div class="grid two">
@@ -929,7 +1624,7 @@ function renderRoutes() {
         <div class="panel-header">
           <div>
             <h2>Route Planning</h2>
-            <p>Route distance, stops, fare, and assigned shift.</p>
+            <p>Route distance, stops, fare, and assigned shift. Showing ${routes.length} of ${state.routes.length} routes.</p>
           </div>
         </div>
         ${renderRouteMap(routes)}
@@ -987,7 +1682,7 @@ function renderRouteMap(routes) {
 }
 
 function renderRoutesTable(routes) {
-  if (!routes.length) return emptyState("No route found for this search.");
+  if (!routes.length) return emptyState("No routes match your search or filters.");
 
   return `
     <div class="table-wrap" style="margin-top:14px">
@@ -1026,16 +1721,15 @@ function renderRoutesTable(routes) {
 }
 
 function renderAccounts() {
-  const expenses = state.expenses.filter((expense) =>
-    matchesSearch(expense.date, vehicleName(expense.vehicleId), expense.category, expense.paidTo, expense.note)
-  );
+  const expenses = getFilteredExpenses();
+  const filteredTrips = getFilteredTrips();
 
   return `
     <div class="grid four">
-      ${metricCard("Collection", money(totalTripCollection()), "All trip entries", "green")}
-      ${metricCard("Trip Cost", money(totalTripExpenses()), "Fuel, toll, repair, challan", "amber")}
-      ${metricCard("Other Expense", money(totalExtraExpenses()), "Office, tax, EMI, workshop", "red")}
-      ${metricCard("Net Profit", money(netProfit()), "Collection minus all expenses", netProfit() >= 0 ? "blue" : "red")}
+      ${metricCard("Collection", money(totalTripCollection(filteredTrips)), "Filtered trip entries", "green")}
+      ${metricCard("Trip Cost", money(totalTripExpenses(filteredTrips)), "Fuel, toll, repair, challan", "amber")}
+      ${metricCard("Other Expense", money(totalExtraExpenses(expenses)), "Office, tax, EMI, workshop", "red")}
+      ${metricCard("Net Profit", money(netProfit(filteredTrips, expenses)), "Final business result", netProfit(filteredTrips, expenses) >= 0 ? "blue" : "red")}
     </div>
 
     <div class="grid two">
@@ -1043,7 +1737,7 @@ function renderAccounts() {
         <div class="panel-header">
           <div>
             <h2>Expense Ledger</h2>
-            <p>Entries outside trip cost, such as tax, EMI, salary, and workshop bills.</p>
+            <p>Entries outside trip cost, such as tax, EMI, salary, and workshop bills. Showing ${expenses.length} of ${state.expenses.length} expenses.</p>
           </div>
           <button class="secondary-button" data-action="export-csv" data-type="expenses">Export CSV</button>
         </div>
@@ -1075,7 +1769,7 @@ function renderAccounts() {
 }
 
 function renderExpensesTable(expenses) {
-  if (!expenses.length) return emptyState("No expense found for this search.");
+  if (!expenses.length) return emptyState("No expenses match your search or filters.");
 
   return `
     <div class="table-wrap">
@@ -1184,9 +1878,7 @@ function renderReminderTimeline(reminders) {
 }
 
 function renderReports() {
-  const trips = state.trips.filter((trip) =>
-    matchesSearch(trip.date, vehicleName(trip.vehicleId), routeName(trip.routeId), staffName(trip.driverId), trip.status)
-  );
+  const trips = getFilteredTrips();
   const vehicleRanking = getVehicleProfitRanking();
   const routeRanking = getRouteProfitRanking();
 
@@ -1465,6 +2157,25 @@ function handleClick(event) {
   if (action === "export-json") exportJson();
   if (action === "print-report") window.print();
   if (action === "reset-demo") resetDemo();
+  if (action === "clear-filters") clearFilters(actionTarget.dataset.filterView);
+}
+
+function clearFilters(view) {
+  if (!view || !defaultFilters[view]) return;
+  state.filters[view] = structuredClone(defaultFilters[view]);
+  saveState();
+  render();
+  showToast("Filters reset.");
+}
+
+function handleFilterChange(event) {
+  const select = event.target.closest("[data-filter-view][data-filter-key]");
+  if (!select) return;
+
+  const { filterView, filterKey } = select.dataset;
+  setFilterValue(filterView, filterKey, select.value);
+  saveState();
+  render();
 }
 
 function deleteItem(collection, id, message) {
@@ -1593,6 +2304,7 @@ function downloadFile(filename, content, type) {
 
 document.addEventListener("submit", handleSubmit);
 document.addEventListener("click", handleClick);
+document.addEventListener("change", handleFilterChange);
 
 document.getElementById("roleSelect").addEventListener("change", (event) => {
   state.role = event.target.value;

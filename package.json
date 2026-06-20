@@ -1,7 +1,7 @@
 {
   "name": "fleetflow-transport-manager",
   "version": "1.0.0",
-  "description": "Premium transport management dashboard made by Aryan Singh Sikarwar.",
+  "description": "Premium transport management dashboard made by Aryan Singh Sikarwar. Phase 2 adds Chart.js analytics via CDN.",
   "private": true,
   "scripts": {
     "start": "python3 -m http.server 5173",

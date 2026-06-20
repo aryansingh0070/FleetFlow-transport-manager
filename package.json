@@ -1,0 +1,19 @@
+{
+  "name": "fleetflow-transport-manager",
+  "version": "1.0.0",
+  "description": "Premium transport management dashboard made by Aryan Singh Sikarwar.",
+  "private": true,
+  "scripts": {
+    "start": "python3 -m http.server 5173",
+    "check": "node --check app.js"
+  },
+  "keywords": [
+    "transport-management",
+    "fleet-management",
+    "dashboard",
+    "placement-project",
+    "javascript"
+  ],
+  "author": "Aryan Singh Sikarwar",
+  "license": "MIT"
+}
